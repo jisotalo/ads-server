@@ -1,0 +1,58 @@
+{
+  "name": "ads-server",
+  "version": "0.0.1",
+  "description": "TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol commands and responds.",
+  "main": "./dist/ads-server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts"
+  },
+  "keywords": [
+    "ADS",
+    "twincat",
+    "beckhoff",
+    "plc",
+    "iec-61131-3",
+    "61131-3",
+    "twincat 2",
+    "twincat 2.11",
+    "twincat 3",
+    "twincat 3.1",
+    "twincat ads",
+    "codesys",
+    "client",
+    "server"
+  ],
+  "author": "Jussi Isotalo <j.isotalo91@gmail.com> (https://github.com/jisotalo)",
+  "license": "MIT",
+  "homepage": "https://jisotalo.github.io/ads-server/",
+  "bugs": {
+    "url": "https://github.com/jisotalo/ads-server/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jisotalo/ads-server.git"
+  },
+  "dependencies": {
+    "debug": "^4.1.1",
+    "iconv-lite": "^0.5.1",
+    "long": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.5",
+    "@types/long": "^4.0.1",
+    "@types/node": "^14.14.14",
+    "@typescript-eslint/eslint-plugin": "^4.11.1",
+    "@typescript-eslint/parser": "^4.11.1",
+    "docdash": "^1.2.0",
+    "eslint": "^7.17.0",
+    "jsdoc": "^3.6.4",
+    "typescript": "^4.1.3"
+  },
+  "files": [
+    "dist/",
+    "CHANGELOG.md",
+    "README.md"
+  ]
+}
