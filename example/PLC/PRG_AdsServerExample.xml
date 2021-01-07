@@ -1,0 +1,315 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0200">
+  <fileHeader companyName="Beckhoff Automation GmbH" productName="TwinCAT PLC Control" productVersion="3.5.13.20" creationDateTime="2021-01-07T10:39:32.1673895" />
+  <contentHeader name="PLC" modificationDateTime="2021-01-07T10:39:32.174389">
+    <coordinateInfo>
+      <fbd>
+        <scaling x="1" y="1" />
+      </fbd>
+      <ld>
+        <scaling x="1" y="1" />
+      </ld>
+      <sfc>
+        <scaling x="1" y="1" />
+      </sfc>
+    </coordinateInfo>
+    <addData>
+      <data name="http://www.3s-software.com/plcopenxml/projectinformation" handleUnknown="implementation">
+        <ProjectInformation />
+      </data>
+    </addData>
+  </contentHeader>
+  <types>
+    <dataTypes />
+    <pous>
+      <pou name="PRG_AdsServerExample" pouType="program">
+        <interface>
+          <localVars>
+            <variable name="AdsRead">
+              <type>
+                <derived name="Tc2_System.ADSREADEX" />
+              </type>
+            </variable>
+            <variable name="ReadValue">
+              <type>
+                <INT />
+              </type>
+            </variable>
+            <variable name="ReadCmd">
+              <type>
+                <BOOL />
+              </type>
+            </variable>
+            <variable name="AdsWrite">
+              <type>
+                <derived name="Tc2_System.ADSWRITE" />
+              </type>
+            </variable>
+            <variable name="WriteValue">
+              <type>
+                <INT />
+              </type>
+              <initialValue>
+                <simpleValue value="5555" />
+              </initialValue>
+            </variable>
+            <variable name="WriteCmd">
+              <type>
+                <BOOL />
+              </type>
+            </variable>
+            <variable name="AdsReadWriter">
+              <type>
+                <derived name="Tc2_System.ADSRDWRTEX" />
+              </type>
+            </variable>
+            <variable name="RW_WriteValue">
+              <type>
+                <string />
+              </type>
+              <initialValue>
+                <simpleValue value="'Temperature 1'" />
+              </initialValue>
+            </variable>
+            <variable name="RW_ReadValue">
+              <type>
+                <REAL />
+              </type>
+            </variable>
+            <variable name="ReadWriteCmd">
+              <type>
+                <BOOL />
+              </type>
+            </variable>
+            <variable name="AdsReadDevInfo">
+              <type>
+                <derived name="Tc2_System.ADSRDDEVINFO" />
+              </type>
+            </variable>
+            <variable name="ReadDevInfoCmd">
+              <type>
+                <BOOL />
+              </type>
+            </variable>
+            <variable name="AdsReadDevState">
+              <type>
+                <derived name="Tc2_System.ADSRDSTATE" />
+              </type>
+            </variable>
+            <variable name="ReadDevStateCmd">
+              <type>
+                <BOOL />
+              </type>
+            </variable>
+            <variable name="AdsWriteCtrl">
+              <type>
+                <derived name="Tc2_System.ADSWRTCTL" />
+              </type>
+            </variable>
+            <variable name="WriteCtrlData">
+              <type>
+                <string />
+              </type>
+              <initialValue>
+                <simpleValue value="'Some test data to write control'" />
+              </initialValue>
+            </variable>
+            <variable name="WriteCtrlCmd">
+              <type>
+                <BOOL />
+              </type>
+            </variable>
+          </localVars>
+          <documentation>
+            <xhtml xmlns="http://www.w3.org/1999/xhtml">
+https://github.com/jisotalo/ads-server
+PRG_AdsServerExample
+
+Copyright (c) 2021 Jussi Isotalo &lt;j.isotalo91@gmail.com&gt;
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</xhtml>
+          </documentation>
+        </interface>
+        <body>
+          <ST>
+            <xhtml xmlns="http://www.w3.org/1999/xhtml">//When ReadCmd is TRUE, a value is read from localhost and ADS port 30012
+AdsRead(
+	NETID	:= , 
+	PORT	:= 30012, 
+	IDXGRP	:= 10,
+	IDXOFFS	:= 100,
+	LEN		:= SIZEOF(ReadValue), 
+	DESTADDR:= ADR(ReadValue), 
+	READ	:= ReadCmd,
+);
+
+IF NOT AdsRead.BUSY THEN
+	//Now ReadValue should be 4455 or AdsReader.ERR is true and AdsReader.ERRID is the error code
+	ReadCmd := FALSE;
+END_IF
+
+//When WriteCmd is TRUE, a value is written to localhost and ADS port 30012
+AdsWrite(
+	NETID	:= , 
+	PORT	:= 30012, 
+	IDXGRP	:= 10,
+	IDXOFFS	:= 100,
+	LEN		:= SIZEOF(WriteValue), 
+	SRCADDR	:= ADR(WriteValue), 
+	WRITE	:= WriteCmd
+);
+
+IF NOT AdsWrite.BUSY THEN
+	WriteCmd := FALSE;
+END_IF
+
+
+//When ReadWriteCmd is TRUE, a value is written to localhost and ADS port 30012 and result is read
+AdsReadWriter(
+	NETID	:= , 
+	PORT	:= 30012, 
+	IDXGRP	:= 10,
+	IDXOFFS	:= 100,
+	WRITELEN:= SIZEOF(RW_WriteValue), 
+	READLEN	:= SIZEOF(RW_ReadValue), 
+	SRCADDR	:= ADR(RW_WriteValue),  
+	DESTADDR:= ADR(RW_ReadValue), 
+	WRTRD	:= ReadWriteCmd
+);
+
+IF NOT AdsReadWriter.BUSY THEN
+	ReadWriteCmd := FALSE;
+END_IF
+
+
+//When ReadDevInfoCmd is TRUE, device info is read from localhost and ADS port 30012
+AdsReadDevInfo(
+	NETID	:= , 
+	PORT	:= 30012,
+	RDINFO	:= ReadDevInfoCmd
+);
+
+IF NOT AdsReadDevInfo.BUSY THEN
+	//NOTE: ADS protocol has major version, minor version and build version unlike the ADS PLC block
+	// -&gt; version is corrupted
+	ReadDevInfoCmd := FALSE;
+END_IF
+
+
+//When AdsReadDevState is TRUE, device state is read from localhost and ADS port 30012
+AdsReadDevState(
+	NETID	:= , 
+	PORT	:= 30012,
+	RDSTATE	:= ReadDevStateCmd
+);
+
+IF NOT AdsReadDevState.BUSY THEN
+	ReadDevStateCmd := FALSE;
+END_IF
+
+//When WriteCtrlCmd is TRUE, values are written to localhost and ADS port 30012
+AdsWriteCtrl(
+	NETID	:= , 
+	PORT	:= 30012,
+	ADSSTATE:= ADSSTATE_RUN, 
+	DEVSTATE:= 123, 
+	LEN		:= SIZEOF(WriteCtrlData), 
+	SRCADDR	:= ADR(WriteCtrlData), 
+	WRITE	:= WriteCtrlCmd
+);
+
+IF NOT AdsWriteCtrl.BUSY THEN
+	WriteCtrlCmd := FALSE;
+END_IF</xhtml>
+          </ST>
+        </body>
+        <addData>
+          <data name="http://www.3s-software.com/plcopenxml/interfaceasplaintext" handleUnknown="implementation">
+            <InterfaceAsPlainText>
+              <xhtml xmlns="http://www.w3.org/1999/xhtml">(*
+https://github.com/jisotalo/ads-server
+PRG_AdsServerExample
+
+Copyright (c) 2021 Jussi Isotalo &lt;j.isotalo91@gmail.com&gt;
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*)
+PROGRAM PRG_AdsServerExample
+VAR
+	AdsRead 	: Tc2_System.ADSREADEX;
+	ReadValue	: INT;
+	ReadCmd		: BOOL;
+	
+	AdsWrite 	: Tc2_System.ADSWRITE;
+	WriteValue	: INT := 5555;
+	WriteCmd	: BOOL;
+	
+	AdsReadWriter	: Tc2_System.ADSRDWRTEX;
+	RW_WriteValue	: STRING := 'Temperature 1';
+	RW_ReadValue	: REAL;
+	ReadWriteCmd	: BOOL;
+	
+	AdsReadDevInfo	: Tc2_System.ADSRDDEVINFO;
+	ReadDevInfoCmd	: BOOL;
+	
+	AdsReadDevState	: Tc2_System.ADSRDSTATE;
+	ReadDevStateCmd	: BOOL;
+	
+	AdsWriteCtrl 	: Tc2_System.ADSWRTCTL;
+	WriteCtrlData	: STRING := 'Some test data to write control';
+	WriteCtrlCmd	: BOOL;
+END_VAR
+</xhtml>
+            </InterfaceAsPlainText>
+          </data>
+          <data name="http://www.3s-software.com/plcopenxml/objectid" handleUnknown="discard">
+            <ObjectId>14fa673f-cd77-428c-aea4-bd1a94d931cb</ObjectId>
+          </data>
+        </addData>
+      </pou>
+    </pous>
+  </types>
+  <instances>
+    <configurations />
+  </instances>
+  <addData>
+    <data name="http://www.3s-software.com/plcopenxml/projectstructure" handleUnknown="discard">
+      <ProjectStructure>
+        <Object Name="PRG_AdsServerExample" ObjectId="14fa673f-cd77-428c-aea4-bd1a94d931cb" />
+      </ProjectStructure>
+    </data>
+  </addData>
+</project>

@@ -1,5 +1,6 @@
 /*
-ads-server.js
+https://github.com/jisotalo/ads-server
+ads-server.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
@@ -89,7 +90,9 @@ const debugIO = Debug(`${PACKAGE_NAME}:raw-data`)
 
 
 /**
- * TODO
+ * TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol commands and responds.
+ * 
+ * Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
  * 
  * This library is not related to Beckhoff in any way.
  *
@@ -104,6 +107,7 @@ export class Server extends EventEmitter {
     socket: null,
 
     //Ads communication
+    nextInvokeId: 0, //Next invoke ID used for ads request
     amsTcpCallback: null, //Callback used for ams/tcp commands (like port register)
     socketConnectionLostHandler: null, //Handler for socket connection lost event
     socketErrorHandler: null, //Handler for socket error event
@@ -606,31 +610,16 @@ export class Server extends EventEmitter {
    
 
   /**
-   * Sends a given data as notification to given ha
+   * Sends a given data as notification using given notificationHandle and target info.
    */
   sendDeviceNotification(notification: AdsNotificationTarget, data: Buffer): Promise<void> {
     return new Promise<void>(async (resolve, reject) => {
 
-      //if (!this.connection.connected)
-      //return reject(new ServerException(this, 'readAndCacheDataTypes()', `Client is not connected. Use connect() to connect to the target first.`))
+      if (!this.connection.connected)
+        return reject(new ServerException(this, 'sendDeviceNotification()', `Server is not connected. Use connect() to connect first.`))
 
-      /*debug(`readAndCacheDataTypes(): Reading all data types`)
+      debug(`sendDeviceNotification(): Sending device notification to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle}`)
 
-      //First, download most recent upload info (=symbol count & byte length)
-      try {
-        debugD(`readAndCacheDataTypes(): Updating upload info`)
-
-        await this.readUploadInfo()
-      } catch (err) {
-        if (this.metaData.uploadInfo === null) {
-          debug(`readAndCacheDataTypes(): Updating upload info failed, no old data available`)
-          return reject(new ServerException(this, 'readAndCacheDataTypes()', `Downloading data types to cache failed (updating upload info failed)`, err))
-        } else {
-          debug(`readAndCacheDataTypes(): Updating upload info failed, using old data`)
-        }
-      }
-      */
-      console.log(notification)
       //Sample
       const sample = Buffer.alloc(8 + data.byteLength)
       let pos = 0
@@ -647,7 +636,6 @@ export class Server extends EventEmitter {
       data.copy(sample, pos)
       pos += data.byteLength
       
-
 
       //Stamp
       const stamp = Buffer.alloc(12)
@@ -667,7 +655,6 @@ export class Server extends EventEmitter {
       pos += 4
 
 
-
       //Notification
       const packet = Buffer.alloc(8)
       pos = 0
@@ -680,22 +667,26 @@ export class Server extends EventEmitter {
       packet.writeUInt32LE(1, pos)
       pos += 4
 
+      //Check that next free invoke ID is below 32 bit integer maximum
+      if (this._internals.nextInvokeId >= ADS.ADS_INVOKE_ID_MAX_VALUE)
+        this._internals.nextInvokeId = 0
+
+
+      //Sending the packet
       _sendAdsCommand.call(this, {
         adsCommand: ADS.ADS_COMMAND.Notification,
-        targetAmsNetId: notification.sourceAmsNetId,
-        targetAdsPort: notification.sourceAdsPort,
-        invokeId: 0,
+        targetAmsNetId: notification.targetAmsNetId,
+        targetAdsPort: notification.targetAdsPort,
+        invokeId: this._internals.nextInvokeId++,
         rawData: Buffer.concat([packet, stamp, sample])
       })
-        .then(async (res) => {
-          
-          //debug(`readAndCacheDataTypes(): All data types read, parsed and cached (data type count: ${dataTypeCount})`)
-          console.log('NOTICICATION SENT')
+        .then(() => {
+          debug(`sendDeviceNotification(): Device notification sent to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle}`)
           resolve()
         })
 
-        .catch((res) => {
-          reject(new ServerException(this, 'readAndCacheDataTypes()', `Downloading data types to cache failed`, res))
+        .catch(res => {
+          reject(new ServerException(this, 'sendDeviceNotification()', `Sending notification to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle} failed`, res))
         })
     })
   }
@@ -2307,6 +2298,6 @@ function _amsNedIdStrToByteArray(str: string) {
 
 
 
-
-exports.ADS = ADS
-exports.Server = Server
+//export * as ServerTypes from './types/ads-server'
+//export * as AdsTypes from './types/ads-types'
+export * as ADS from './ads-commons'

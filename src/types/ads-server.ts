@@ -1,5 +1,6 @@
 /*
-types/ads-server.js
+https://github.com/jisotalo/ads-server
+types/ads-server.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
@@ -26,25 +27,25 @@ import type { Socket } from 'net'
 import type { AmsTcpPacket } from './ads-types'
 
 export interface ServerSettings {
-  /** Optional: Target ADS router TCP port*/
+  /** Optional: Target ADS router TCP port (default: 48898) */
   routerTcpPort: number,
-  /** Optional: Target ADS router IP address/hostname */
+  /** Optional: Target ADS router IP address/hostname (default: 'localhost') */
   routerAddress: string,
-  /** Optional: Local IP address to use, use this to change used network interface if required */
+  /** Optional: Local IP address to use, use this to change used network interface if required (default: '' = automatic) */
   localAddress: string,
-  /** Optional: Local TCP port to use for outgoing connections */
+  /** Optional: Local TCP port to use for outgoing connections (default: 0 = automatic) */
   localTcpPort: number,
-  /** Optional: Local AmsNetId to use */
+  /** Optional: Local AmsNetId to use (default: automatic) */
   localAmsNetId: string,
-  /** Optional: Local ADS port to use */
+  /** Optional: Local ADS port to use (default: automatic/router provides) */
   localAdsPort: number,
-  /** Optional: Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout */
+  /** Optional: Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout (default: 2000) */
   timeoutDelay: number,
-  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) */
+  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
   hideConsoleWarnings: boolean,
-  /** Optional: If true and connection to the router is lost, the server tries to reconnect automatically */
+  /** Optional: If true and connection to the router is lost, the server tries to reconnect automatically (default: true) */
   autoReconnect: boolean,
-  /** Optional: Time (milliseconds) how often the lost connection is tried to re-establish */
+  /** Optional: Time (milliseconds) how often the lost connection is tried to re-establish (default: 2000) */
   reconnectInterval: number,
 }
 
@@ -55,13 +56,17 @@ export interface ServerInternals {
   receiveDataBuffer: Buffer,
   /** Active socket that is used */
   socket: Socket | null,
+  /** Next free invoke ID */
+  nextInvokeId: number,
   /** Callback that is called when AMS TCP command is received (port register etc.) */
   amsTcpCallback: ((packet: AmsTcpPacket) => void) | null,
   /** Callback handler for socket connection lost event */
   socketConnectionLostHandler: (() => void) | null,
   /** Callback handler for socket error event */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   socketErrorHandler: ((err: any) => void) | null, //Handler for socket error event
   /** Timer handle for reconnecting intervally */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   reconnectionTimer: any,
   /** Active callbacks for ADS requests */
   requestCallbacks: {
@@ -74,7 +79,9 @@ export interface ServerInternals {
  * Just tells that we have req, res and packet properties
  */
 export type GenericReqCallback = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   req: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res: any,
   packet?: AmsTcpPacket
 ) => void
@@ -117,6 +124,7 @@ export interface AdsNotificationTarget {
   targetAmsNetId: string,
   /** Target system ADS port (that subscribed to notifications) */
   targetAdsPort: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
 }
 
@@ -242,6 +250,7 @@ export interface UnknownAdsRequest {
  * Empty ads request (no payload)
  */
 export type EmptyReq = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [K in any]: never //allow only empty object
 }
 

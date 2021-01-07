@@ -1,5 +1,6 @@
 /*
-ads-commons.js
+https://github.com/jisotalo/ads-server
+ads-commons.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
