@@ -1,5 +1,6 @@
 /*
-types/ads-server.js
+https://github.com/jisotalo/ads-server
+types/ads-server.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
