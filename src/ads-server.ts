@@ -1041,6 +1041,7 @@ async function _onConnectionLost(this: Server, socketFailure = false) {
   const tryToReconnect = async (firstTime: boolean) => {
     this.reconnect(socketFailure)
       .then(() => {
+        _console.call(this, 'Reconnected successfully')
         debug(`_onConnectionLost(): Connection reinitialized`)
       })
       .catch(err => {
@@ -1164,7 +1165,7 @@ async function _onRouterStateChanged(this: Server, data: AmsTcpPacket) {
 
   } else {
     //Nothing to do, just wait until router has started again..
-    _console.call(this, `WARNING: Local AMS router state has changed to ${ADS.AMS_ROUTER_STATE.toString(state)}. Connection and active subscriptions might have been lost.`)
+    _console.call(this, `WARNING: Local AMS router state has changed to ${ADS.AMS_ROUTER_STATE.toString(state)}. Connection might have been lost.`)
   }
 }
 
