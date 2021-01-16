@@ -1,6 +1,6 @@
 {
   "name": "ads-server",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol commands and responds.",
   "main": "./dist/ads-server.js",
   "scripts": {
