@@ -10,15 +10,6 @@ TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol c
 If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client).
 
 
-# Project status
-
-Currently in testing. Should work OK.
-
-
-# NOTE
-
-This is my first project with Typescript, so it probably includes lot's of things to be done differently.
-
 # Table of contents
 - [Installing and configuration](#installing-and-configuration)
 - [Available ADS commands](#available-ads-commands)
