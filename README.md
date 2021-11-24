@@ -21,8 +21,8 @@ If you need an ADS client for reading/writing PLC values, see my other project [
 - [Installing](#installing)
 - [Selecting correct server class to use](#selecting-correct-server-class-to-use)
 - [Configuration](#configuration)
-  * [`Server` class](#-server--class)
-  * [`StandAloneServer` class](#-standaloneserver--class)
+  * [`Server` class](#-server-class)
+  * [`StandAloneServer` class](#-standaloneserver-class)
 - [Available ADS commands](#available-ads-commands)
   * [Read request](#read-request)
   * [Write request](#write-request)
@@ -33,15 +33,20 @@ If you need an ADS client for reading/writing PLC values, see my other project [
   * [AddNotification requests](#addnotification-requests)
   * [DeleteNotification requests](#deletenotification-requests)
   * [Sending a notification](#sending-a-notification)
-- [NOTE: Difference when using `StandAloneServer`](#note--difference-when-using--standaloneserver-)
-- [Example: All example codes as a working version](#example--all-example-codes-as-a-working-version)
-- [Example: How to display full ADS packet from (debug etc.)](#example--how-to-display-full-ads-packet-from--debug-etc-)
-- [Example: Handling device notifications with ads-client](#example--handling-device-notifications-with-ads-client)
+- [NOTE: Difference when using `StandAloneServer`](#note-difference-when-using-standaloneserver-)
+- [Handling IEC-61131 data types](#handling-iec-61131-data-types)
+  * [Responding with a IEC data type](#responding-with-a-iec-data-type)
+  * [Responding with a STRUCT](#responding-with-a-struct)
+- [Example: All example codes as a working version](#example-all-example-codes-as-a-working-version)
+- [Example: How to display full ADS packet from (debug etc.)](#example-how-to-display-full-ads-packet-from-debug-etc-)
+- [Example: Handling device notifications with ads-client](#example-handling-device-notifications-with-ads-client)
+- [Example: Creating a fake PLC](#example-creating-a-fake-plc)
+  * [Base code for fake PLC system with `Server`](#base-code-for-fake-plc-system-with-server-)
+  * [Base code for fake PLC system with `StandAloneServer`](#base-code-for-fake-plc-system-with-standaloneserver-)
 - [Debugging](#debugging)
   * [Enabling debug from code](#enabling-debug-from-code)
   * [Enabling debugging from terminal](#enabling-debugging-from-terminal)
 - [License](#license)
-
 # Installing
 
 Install the package from NPM using command:
@@ -597,6 +602,86 @@ server.onReadReq(async (req, res, packet, adsPort) => {
 
   //Then do the magic here..
 })
+```
+
+# Handling IEC-61131 data types
+
+It's not too easy to work with byte buffers if you want to respond to a PLC request.
+
+Instead, you can use the [iec-61131-3](https://github.com/jisotalo/iec-61131-3) library to work with IEC data types.
+
+## Responding with a IEC data type
+
+Some examples how to respond with different data types:
+
+```js
+const iec = require('iec-61131-3')
+
+//...
+
+//DINT
+await res({
+  data: iec.DINT.convertToBuffer(12345)
+})
+
+//STRING
+await res({
+  data: iec.STRING(81).convertToBuffer('Convert this!')
+})
+
+//ARRAY[0..2] OF INT
+await res({
+  data: iec.ARRAY(iec.INT, 3).convertToBuffer([1, 2, 3])
+})
+
+//DT
+await res({
+  data: iec.DT.convertToBuffer(new Date().getTime() / 1000)
+})
+```
+
+The same library can be used with `ads-client`. For example:
+
+```js
+const iec = require('iec-61131-3')
+
+//...
+
+//Reading the ARRAY[0..2] OF INT defined above (indexGroup and indexOffset are just examples)
+const data = await client.readRaw(1, 2, iec.ARRAY(iec.INT, 3).byteLength)
+const arr = iec.ARRAY(iec.INT, 3).convertFromBuffer(data)
+console.log(arr) //"[ 1, 2, 3 ]"
+
+//Reading the STRING defined above (indexGroup and indexOffset are just examples)
+const data = await client.readRaw(1, 2, iec.STRING(81).byteLength)
+const str = iec.STRING(81).convertFromBuffer(data)
+console.log(str) //"Convert this!"
+```
+
+## Responding with a STRUCT
+
+```js
+const iec = require('iec-61131-3')
+
+//...
+
+const ST_Struct = iec.fromString(`
+  {attribute 'pack_mode' := '1'}
+  TYPE ST_Struct:
+  STRUCT
+    variable1: INT;
+    variable2: REAL;
+  END_STRUCT
+  END_TYPE
+`)
+
+const data = ST_Struct.convertToBuffer({
+  variable1: 123,
+  variable2: 3.14
+})
+
+await res({ data })
+
 ```
 
 # Example: All example codes as a working version
