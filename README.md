@@ -14,12 +14,13 @@ Listens for incoming ADS protocol commands and responds. This library can be use
 - to use ADS protocol to communicate for your own systems
 
 There are two servers available:
-- `Server` for using with TwinCAT installation (or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
-  - For TwinCAT PLCs, Windows PCs, or any system with AMS router available
+- `Server` for using with TwinCAT installation or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
+  - For TwinCAT PLCs and Windows PCs with TwinCAT installation
+  - For Raspberry Pi, Linux, etc. wth [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
 - `StandAloneServer` for using without TwinCAT installation
-  - For Raspberry Pi, Linux, etc.
+  - For Raspberry Pi, Linux, etc. (nothing else is needed)
 
-If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client). This is the opposite.
+If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client).
 
 
 # Table of contents
@@ -97,8 +98,10 @@ const server = new Server({
 
 //Connect to the local AMS router
 server.connect()
-  .then(conn => {
+  .then(async conn => {
     console.log('Connected:', conn)
+    //To disconnect:
+    //await server.disconnect()
   })
   .catch(err => {
     console.log('Connecting failed:', err)
@@ -138,7 +141,7 @@ Available settings for `Server`:
 
 The only required setting for `StandAloneServer` is `localAmsNetId`. Unlike `Server`, it listens for all ADS ports for incoming commands.
 
-The `localAmsNetId` can be decided freely. Only requirement is that it's not by any other system. It is needed when creating a static route from another system.
+The `localAmsNetId` can be decided freely. Only requirement is that it's not in use by any other system. It is needed when creating a static route from another system.
 
 ```js
 const { StandAloneServer } = require('ads-server')
@@ -149,8 +152,11 @@ const server = new StandAloneServer({
 })
 
 server.listen()
-  .then(conn => {
+  .then(async conn => {
     console.log('Listening:', conn)
+
+    //To stop listening:
+    //await server.close()
   })
   .catch(err => {
     console.log('Listening failed:', err)
@@ -541,17 +547,18 @@ await server.sendDeviceNotification({
 
 # NOTE: Difference when using `StandAloneServer`
 
-The examples for 1:1 for `StandAloneServer`, however there is one **major** difference.
+The examples work 1:1 for `StandAloneServer`, however there is one **major** difference.
 
-The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter of the callback function.
+The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter `adsPort` of the callback function or `packet.ams.targetAdsPort`.
 
 ```ts
+//Note: adsPort
 server.onReadReq(async (req, res, packet, adsPort) => {
   console.log('Read request', req, 'received to ADS port', adsPort)
 
   const data = Buffer.alloc(2)
 
-  switch (adsPort) {
+  switch (adsPort) { //adsPort or packet.ams.targetAdsPort
     case 30012:
       //Request for ADS port 30012 -> respond 5555
       data.writeInt16LE(5555)
@@ -574,6 +581,23 @@ server.onReadReq(async (req, res, packet, adsPort) => {
         error: 6 //ADS error code, "Target port not found"
       }).catch(err => console.log('Responding failed:', err))
   }
+})
+```
+If you have a need for only one ADS port, you might do something as simple as:
+
+```ts
+server.onReadReq(async (req, res, packet, adsPort) => {
+  console.log('Read request', req, 'received to ADS port', adsPort)
+
+  if (adsPort !== 30012) { //adsPort or packet.ams.targetAdsPort
+    await res({
+      error: 6 //ADS error code, "Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+
+    return 
+  }
+
+  //Then do the magic here..
 })
 ```
 
@@ -633,7 +657,7 @@ Full packet is: {
   ads: { indexGroup: 10, indexOffset: 100, readLength: 2 }
 }
 ```
-
+As of version 1.1.0, there is also 4th parameter `adsPort`, which is the same as `packet.ams.targetAdsPort`.
 # Example: Handling device notifications with ads-client
 
 The PLC seems not to have any functionality to register notifications. So it's only available for 3rd party clients. For example using `subscribe()` in [ads-client](https://github.com/jisotalo/ads-client) library.
