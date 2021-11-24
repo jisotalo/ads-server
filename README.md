@@ -5,20 +5,14 @@
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-server)
 [![License](https://img.shields.io/github/license/jisotalo/ads-server)](https://choosealicense.com/licenses/mit/)
 
-TwinCAT ADS server for Node.js (unofficial). 
+TwinCAT ADS server for Node.js (unofficial).  Listens for incoming ADS protocol commands and responds. 
 
-Listens for incoming ADS protocol commands and responds. This library can be used for example 
-- to create a server that can be connected from any TwinCAT PLC for reading and writing using ADS commands
+**Example use cases:**
+- Creating a server that can be connected from any TwinCAT PLC for reading and writing using ADS commands
   - No need to write own protocols or to buy separate licenses
-- to create a "fake PLC" to test your system that uses [ads-client](https://github.com/jisotalo/ads-client) under the hood
-- to use ADS protocol to communicate for your own systems
+- Creating a "fake PLC" to test your system that uses [ads-client](https://github.com/jisotalo/ads-client) under the hood
+- Using ADS protocol to communicate for your own systems
 
-There are two servers available:
-- `Server` for using with TwinCAT installation or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
-  - For TwinCAT PLCs and Windows PCs with TwinCAT installation
-  - For Raspberry Pi, Linux, etc. wth [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
-- `StandAloneServer` for using without TwinCAT installation
-  - For Raspberry Pi, Linux, etc. (nothing else is needed)
 
 If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client).
 
@@ -68,14 +62,17 @@ As mentioned in the beginning, there are two servers available (since version 1.
   - For Raspberry Pi, Linux, etc. wth [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
 - `StandAloneServer` for using without TwinCAT installation
   - For Raspberry Pi, Linux, etc. (nothing else is needed)
-  - Use this unless you need `AdsRouterConsole`
+  - Use this if you don't have TC installed (unless you need `AdsRouterConsole` for some reason)
 
-The difference between to classes is that `Server` connects to the AMS router and then waits for incoming packets. The `StandAloneServer` starts its own TCP server (port 48898) and listens for any incoming packets.
+**Differences:**
+- `Server` connects to the AMS router and then waits for incoming packets
+  - The `StandAloneServer` starts its own TCP server (port 48898) and listens for any incoming packets
+- `Server` listens for commands to only one ADS port (however multiple instances can be created)
+  - The `StandAloneServer` listens to all ADS ports (only single instance possible)
 
-Another difference is that `Server` listens for commands to only one ADS port. The `StandAloneServer` listens to all ADS ports.
+**NOTE:** The following examples are for `Server`, however they work 1:1 with `StandAloneServer`.
 
-**The following examples are for `Server`. They will work 1:1 with `StandAloneServer`.
- Please see chapter [NOTE: Difference when using `StandAloneServer`](#note--difference-when-using--standaloneserver-) for `StandAloneServer` specific notes.**
+ Please see chapter [NOTE: Difference when using `StandAloneServer`](#note--difference-when-using--standaloneserver-) for specific notes.**
 
 # Configuration
 
@@ -100,6 +97,7 @@ const server = new Server({
 server.connect()
   .then(async conn => {
     console.log('Connected:', conn)
+    
     //To disconnect:
     //await server.disconnect()
   })
