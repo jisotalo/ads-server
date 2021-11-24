@@ -5,13 +5,29 @@
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-server)
 [![License](https://img.shields.io/github/license/jisotalo/ads-server)](https://choosealicense.com/licenses/mit/)
 
-TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol commands and responds.
+TwinCAT ADS server for Node.js (unofficial). 
 
-If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client).
+Listens for incoming ADS protocol commands and responds. This library can be used for example 
+- to create a server that can be connected from any TwinCAT PLC for reading and writing using ADS commands
+  - No need to write own protocols or to buy separate licenses
+- to create a "fake PLC" to test your system that uses [ads-client](https://github.com/jisotalo/ads-client) under the hood
+- to use ADS protocol to communicate for your own systems
+
+There are two servers available:
+- `Server` for using with TwinCAT installation (or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
+  - For TwinCAT PLCs, Windows PCs, or any system with AMS router available
+- `StandAloneServer` for using without TwinCAT installation
+  - For Raspberry Pi, Linux, etc.
+
+If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client). This is the opposite.
 
 
 # Table of contents
-- [Installing and configuration](#installing-and-configuration)
+- [Installing](#installing)
+- [Selecting correct server class to use](#selecting-correct-server-class-to-use)
+- [Configuration](#configuration)
+  * [`Server` class](#-server--class)
+  * [`StandAloneServer` class](#-standaloneserver--class)
 - [Available ADS commands](#available-ads-commands)
   * [Read request](#read-request)
   * [Write request](#write-request)
@@ -22,6 +38,7 @@ If you need an ADS client for reading/writing PLC values, see my other project [
   * [AddNotification requests](#addnotification-requests)
   * [DeleteNotification requests](#deletenotification-requests)
   * [Sending a notification](#sending-a-notification)
+- [NOTE: Difference when using `StandAloneServer`](#note--difference-when-using--standaloneserver-)
 - [Example: All example codes as a working version](#example--all-example-codes-as-a-working-version)
 - [Example: How to display full ADS packet from (debug etc.)](#example--how-to-display-full-ads-packet-from--debug-etc-)
 - [Example: Handling device notifications with ads-client](#example--handling-device-notifications-with-ads-client)
@@ -30,16 +47,50 @@ If you need an ADS client for reading/writing PLC values, see my other project [
   * [Enabling debugging from terminal](#enabling-debugging-from-terminal)
 - [License](#license)
 
-# Installing and configuration
+# Installing
 
-The localAdsPort can be any non-reserved ADS port. See `ADS_RESERVED_PORTS` type at [src/ads-commons.ts](https://github.com/jisotalo/ads-server/blob/master/src/ads-commons.ts). A port number over 20000 should be OK.
+Install the package from NPM using command:
+```bash
+npm i ads-server
+```
+Or if you like, you can clone the git repository and then build using command:
+```bash
+npm run build
+```
+After that, compiled sources are located under `./dist/`
 
-It should be always provided to ensure a static ADS port. Otherwise, the router provides next free one which always changes -> PLC/client code needs to be changed.
+# Selecting correct server class to use
 
-Javascript:
+As mentioned in the beginning, there are two servers available (since version 1.1.0)
+- `Server` for using with TwinCAT installation or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
+  - For TwinCAT PLCs and Windows PCs with TwinCAT installation
+  - For Raspberry Pi, Linux, etc. wth [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
+- `StandAloneServer` for using without TwinCAT installation
+  - For Raspberry Pi, Linux, etc. (nothing else is needed)
+  - Use this unless you need `AdsRouterConsole`
+
+The difference between to classes is that `Server` connects to the AMS router and then waits for incoming packets. The `StandAloneServer` starts its own TCP server (port 48898) and listens for any incoming packets.
+
+Another difference is that `Server` listens for commands to only one ADS port. The `StandAloneServer` listens to all ADS ports.
+
+**The following examples are for `Server`. They will work 1:1 with `StandAloneServer`.
+ Please see chapter [NOTE: Difference when using `StandAloneServer`](#note--difference-when-using--standaloneserver-) for `StandAloneServer` specific notes.**
+
+# Configuration
+
+## `Server` class
+
+The `localAdsPort` can be any non-reserved ADS port. See `ADS_RESERVED_PORTS` type at [src/ads-commons.ts](https://github.com/jisotalo/ads-server/blob/master/src/ads-commons.ts). A port number over 20000 should be OK.
+
+The `localAdsPort` should **always be provided** to ensure a static ADS port. Otherwise, the router provides next free one which always changes -> PLC/client code needs to be changed.
+
+The setting are provided when creating the `Server` object and they are all optional. As default, the `Server` connects to the local AMS router running at localhost but it can be changed from settings.
+
 ```js
 const { Server } = require('ads-server')
+//import { Server } from 'ads-server' //Typescript
 
+//Creating a new server instance at ADS port 30012
 const server = new Server({
   localAdsPort: 30012
 })
@@ -54,31 +105,16 @@ server.connect()
   })
 ```
 
-Typescript:
-```ts
-import { Server } from 'ads-server'
-
-//Creating a new server instace at ADS port 30012
-const server = new Server({
-  localAdsPort: 30012
-})
-
-//Connect to the local AMS router
-server.connect()
-  .then(conn => {
-    console.log('Connected:', conn)
-  })
-  .catch(err => {
-    console.log('Connecting failed:', err)
-  })
-
-```
-The setting are provided when creating the Server object and they are all optional. As default, the Server connects to the local AMS router running at localhost but it can be changed from settings.
-
-Available settings:
+Available settings for `Server`:
 
 ```ts
 {
+  /** Optional: Local ADS port to use (default: automatic/router provides) */
+  localAdsPort: number,
+  /** Optional: Local AmsNetId to use (default: automatic) */
+  localAmsNetId: string,
+  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
+  hideConsoleWarnings: boolean,
   /** Optional: Target ADS router TCP port (default: 48898) */
   routerTcpPort: number,
   /** Optional: Target ADS router IP address/hostname (default: 'localhost') */
@@ -89,18 +125,54 @@ Available settings:
   localTcpPort: number,
   /** Optional: Local AmsNetId to use (default: automatic) */
   localAmsNetId: string,
-  /** Optional: Local ADS port to use (default: automatic/router provides) */
-  localAdsPort: number,
   /** Optional: Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout (default: 2000) */
   timeoutDelay: number,
-  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
-  hideConsoleWarnings: boolean,
   /** Optional: If true and connection to the router is lost, the server tries to reconnect automatically (default: true) */
   autoReconnect: boolean,
   /** Optional: Time (milliseconds) how often the lost connection is tried to re-establish (default: 2000) */
   reconnectInterval: number,
 }
 ```
+
+## `StandAloneServer` class
+
+The only required setting for `StandAloneServer` is `localAmsNetId`. Unlike `Server`, it listens for all ADS ports for incoming commands.
+
+The `localAmsNetId` can be decided freely. Only requirement is that it's not by any other system. It is needed when creating a static route from another system.
+
+```js
+const { StandAloneServer } = require('ads-server')
+//import { StandAloneServer } from 'ads-server' //Typescript
+
+const server = new StandAloneServer({
+  localAmsNetId: '192.168.5.10.1.1' //You can decide whatever you like (needs to be free)
+})
+
+server.listen()
+  .then(conn => {
+    console.log('Listening:', conn)
+  })
+  .catch(err => {
+    console.log('Listening failed:', err)
+  })
+```
+
+
+Available settings for `StandAloneServer`:
+
+```ts
+{
+  /** Local AmsNetId to use */
+  localAmsNetId: string,
+  /** Optional: Local IP address to use, use this to change used network interface if required (default: '' = automatic) */
+  listeningAddress: string,
+  /** Optional: Local TCP port to listen for incoming connections (default: 48898) */
+  listeningTcpPort: number
+  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
+  hideConsoleWarnings: boolean,
+}
+```
+
 
 # Available ADS commands
 
@@ -467,6 +539,44 @@ await server.sendDeviceNotification({
 }, data)
 ```
 
+# NOTE: Difference when using `StandAloneServer`
+
+The examples for 1:1 for `StandAloneServer`, however there is one **major** difference.
+
+The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter of the callback function.
+
+```ts
+server.onReadReq(async (req, res, packet, adsPort) => {
+  console.log('Read request', req, 'received to ADS port', adsPort)
+
+  const data = Buffer.alloc(2)
+
+  switch (adsPort) {
+    case 30012:
+      //Request for ADS port 30012 -> respond 5555
+      data.writeInt16LE(5555)
+
+      await res({ data })
+        .catch(err => console.log('Responding failed:', err))
+      break
+    
+    case 30013:
+      //Request for ADS port 30013 -> respond 888
+      data.writeInt16LE(888)
+
+      await res({ data })
+        .catch(err => console.log('Responding failed:', err))
+    
+      break
+    
+    default:
+      await res({
+        error: 6 //ADS error code, "Target port not found"
+      }).catch(err => console.log('Responding failed:', err))
+  }
+})
+```
+
 # Example: All example codes as a working version
 
 Please see `./example` directory in the repository for working example (both PLC and server side).
@@ -493,7 +603,7 @@ The PLC code is exported as PlcOpenXML format.
 
 # Example: How to display full ADS packet from (debug etc.)
 
-In the examples above, a callback of type `(req, res)` is provided for each function. It is also possible to provide 3rd parameter `(req, res, packet)` for debuggin purposes.
+In the examples above, a callback of type `(req, res)` is provided for each function. It is also possible to provide 3rd parameter `(req, res, packet)` for debugging purposes.
 
 ```ts
 server.onReadReq(async (req, res, packet) => {

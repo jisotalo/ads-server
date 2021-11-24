@@ -102,6 +102,7 @@ export class StandAloneServer extends ServerCore {
 
         //Error during startup
         const handleErrorAtStart = (err: Error) => {
+          this.debug(`listen(): Creating socket server failed: ${err.message}`)
           reject(err)
         }
         this.server.on('error', handleErrorAtStart)
