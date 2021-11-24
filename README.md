@@ -818,7 +818,166 @@ const client = new ads.Client({
 })
 ```
 
-The following can be used as a base to fake a PLC system:
+## Base code for fake PLC system with `Server`
+
+The following can be used as a base to fake a PLC system. 
+
+The system manager is handled by TwinCAT router or some other router.
+
+```js
+const { Server, ADS } = require('./ads-server/dist/ads-server')
+
+const server = new Server({
+  localAdsPort: ADS.ADS_RESERVED_PORTS.Tc3_Plc1 //NOTE: Local PLC can't be running at the same time
+})
+
+server.onReadState(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      adsState: ADS.ADS_STATE.Run,
+      deviceState: 0
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadDeviceInfo(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      deviceName: 'Fake PLC runtime 1',
+      majorVersion: 1,
+      minorVersion: 0,
+      versionBuild: 1
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onAddNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.DeviceData) {
+      //Runtime state changes
+      await res({
+        notificationHandle: 1 //This isn't correct way, see example "Handling device notifications with ads-client"
+      }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadReq(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUploadInfo2) {
+      //Upload info, responding 0 to all for now
+      const data = Buffer.alloc(24)
+      let pos = 0
+
+      //0..3 Symbol count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //4..7 Symbol length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //8..11 Data type count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //12..15 Data type length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //16..19 Extra count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //20..23 Extra length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      await res({
+        data
+      }).catch(err => console.log('Responding failed:', err))
+
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onDeleteNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.notificationHandle === 1) { //This isn't correct way, see example "Handling device notifications with ads-client"
+      await res({ }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handle deletion should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+
+server.connect()
+  .then(res => {
+    console.log('Connected:', res)
+  })
+  .catch(err => {
+    console.log('Error starting:', err)
+  })
+
+```
+
+## Base code for fake PLC system with `StandAloneServer`
+
+The following can be used as a base to fake a PLC system. It also handles system manager at port 10000.
+
+Won't work if there is a local router.
 ```js
 const { StandAloneServer, ADS } = require('./ads-server/dist/ads-server')
 
