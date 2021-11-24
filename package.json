@@ -1,11 +1,12 @@
 {
   "name": "ads-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol commands and responds.",
   "main": "./dist/ads-server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
+    "watch": "tsc --watch",
     "lint": "eslint . --ext .ts"
   },
   "keywords": [

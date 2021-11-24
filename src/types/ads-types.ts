@@ -1,6 +1,5 @@
 /*
 https://github.com/jisotalo/ads-server
-types/ads-server.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
@@ -92,6 +91,10 @@ export interface AdsCommandToSend {
   targetAmsNetId: string,
   /** Target ADS port (receiver) */
   targetAdsPort: number,
+  /** Source AmsNetId (sender) */
+  sourceAmsNetId: string,
+  /** Source ADS port (sender) */
+  sourceAdsPort: number,
   /** Invoke ID to use */
   invokeId: number,
   /** Raw data to be sent as Buffer */
