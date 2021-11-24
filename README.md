@@ -97,7 +97,7 @@ const server = new Server({
 server.connect()
   .then(async conn => {
     console.log('Connected:', conn)
-    
+
     //To disconnect:
     //await server.disconnect()
   })
@@ -656,6 +656,7 @@ Full packet is: {
 }
 ```
 As of version 1.1.0, there is also 4th parameter `adsPort`, which is the same as `packet.ams.targetAdsPort`.
+
 # Example: Handling device notifications with ads-client
 
 The PLC seems not to have any functionality to register notifications. So it's only available for 3rd party clients. For example using `subscribe()` in [ads-client](https://github.com/jisotalo/ads-client) library.
@@ -793,6 +794,214 @@ client.connect()
   })
   .catch(err => console.log('Failed to connect:', err))
 ```
+
+# Example: Creating a fake PLC
+The following needs to be provided by the ADS server in order the `ads-client` sees it as a normal PLC:
+- System manager state
+- PLC runtime state
+- PLC runtime state changes (notifications)
+- Device info
+- Upload info
+- *Optional: Symbol version*
+- *Optional: Symbol version changes (notifications)*
+- *Optional: Symbols*
+- *Optional: Data types*
+
+In this example the optional parts are skipped. In order the `ads-client` to work without them, following settings need to be provided to `ads-client`:
+
+```js
+const client = new ads.Client({
+  //Unrelevant settings not shown
+  disableSymbolVersionMonitoring: true,
+  readAndCacheSymbols: false,
+  readAndCacheDataTypes: false,
+})
+```
+
+The following can be used as a base to fake a PLC system:
+```js
+const { StandAloneServer, ADS } = require('./ads-server/dist/ads-server')
+
+const server = new StandAloneServer({
+  localAmsNetId: '192.168.5.1.1.1'
+})
+
+server.onReadState(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      adsState: ADS.ADS_STATE.Run,
+      deviceState: 0
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      adsState: ADS.ADS_STATE.Run,
+      deviceState: 0
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadDeviceInfo(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      deviceName: 'Fake PLC',
+      majorVersion: 1,
+      minorVersion: 0,
+      versionBuild: 1
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      deviceName: 'Fake PLC runtime 1',
+      majorVersion: 1,
+      minorVersion: 0,
+      versionBuild: 1
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onAddNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      error: 1793 //"Service is not supported by server"
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.DeviceData) {
+      //Runtime state changes
+      await res({
+        notificationHandle: 1 //This isn't correct way, see example "Handling device notifications with ads-client"
+      }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadReq(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      error: 1793 //"Service is not supported by server"
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUploadInfo2) {
+      //Upload info, responding 0 to all for now
+      const data = Buffer.alloc(24)
+      let pos = 0
+
+      //0..3 Symbol count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //4..7 Symbol length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //8..11 Data type count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //12..15 Data type length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //16..19 Extra count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //20..23 Extra length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      await res({
+        data
+      }).catch(err => console.log('Responding failed:', err))
+
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onDeleteNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      error: 1793 //"Service is not supported by server"
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.notificationHandle === 1) { //This isn't correct way, see example "Handling device notifications with ads-client"
+      await res({ }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handle deletion should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+
+server.listen()
+  .then(res => {
+    console.log('Listening:', res)
+  })
+  .catch(err => {
+    console.log('Error starting to listen:', err)
+  })
+
+```
+
 # Debugging
 
 To debug each received packet, see: [Example: How to display full ADS packet from (debug etc.)](#example--how-to-display-full-ads-packet-from--debug-etc-)

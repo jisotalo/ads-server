@@ -465,7 +465,7 @@ export class RouterServer extends ServerCore {
    * Registers a new ADS port from AMS router
    */
   private registerAdsPort(): Promise<AmsTcpPacket> {
-    return new Promise<AmsTcpPacket>((resolve, reject) => {
+    return new Promise<AmsTcpPacket>(async (resolve, reject) => {
       this.debugD(`registerAdsPort(): Registering an ADS port from ADS router ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
 
       //If a manual AmsNetId and ADS port values are used, we should resolve immediately
@@ -541,8 +541,11 @@ export class RouterServer extends ServerCore {
       this.socket?.once('error', errorHandler)
 
       try {
-        if (this.socket)
-          this.socketWrite(packet, this.socket)
+        if (this.socket) {
+          await this.socketWrite(packet, this.socket)
+        } else {
+          throw new ServerException(this, 'registerAdsPort()', `Error - Writing to socket failed, socket is not available`)
+        }
 
       } catch (err) {
         this.socket?.off('error', errorHandler)
@@ -562,7 +565,7 @@ export class RouterServer extends ServerCore {
    * Connection is usually also closed by remote during unregisterin.
    */
   private unregisterAdsPort(): Promise<void> {
-    return new Promise<void>(async (resolve) => {
+    return new Promise<void>(async (resolve, reject) => {
       this.debugD(`unregisterAdsPort(): Unregister ads port ${this.connection.localAdsPort} from ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
 
       if (this.settings.localAmsNetId && this.settings.localAdsPort) {
@@ -621,7 +624,11 @@ export class RouterServer extends ServerCore {
         resolve()
       })
 
-      this.socketWrite(buffer, this.socket)
+      try {
+        await this.socketWrite(buffer, this.socket)
+      } catch (err) {
+        reject(err)
+      }
     })
   }
 

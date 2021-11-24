@@ -975,7 +975,7 @@ export abstract class ServerCore extends EventEmitter {
 
       //Write the data 
       try {
-        this.socketWrite(request, socket)
+        await this.socketWrite(request, socket)
         return resolve()
       } catch (err) {
         return reject(new ServerException(this, 'sendAdsCommand()', `Error - Socket is not available`, err as Error))
@@ -1243,14 +1243,22 @@ export abstract class ServerCore extends EventEmitter {
    * @param data Data to write
    * @param socket Socket to write to
    */
-  protected socketWrite(data: Buffer, socket: Socket): void {
-    if (this.debugIO.enabled) {
-      this.debugIO(`IO out ------> ${data.byteLength} bytes : ${data.toString('hex')}`)
-    } else {
-      this.debugD(`IO out ------> ${data.byteLength} bytes`)
-    }
+  protected socketWrite(data: Buffer, socket: Socket): Promise<void> {
+    return new Promise<void>(async (resolve, reject) => {
+      if (this.debugIO.enabled) {
+        this.debugIO(`IO out ------> ${data.byteLength} bytes : ${data.toString('hex')}`)
+      } else {
+        this.debugD(`IO out ------> ${data.byteLength} bytes`)
+      }
 
-    socket.write(data)
+      socket.write(data, err => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve()
+        }
+      })
+    })
   }
 
   /**
