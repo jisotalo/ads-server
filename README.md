@@ -541,7 +541,7 @@ server.onDeleteNotification(async (req, res) => {
 Not available with a PLC as a client, see an example with `ads-client` later.
 
 
-Node.js (server):
+When using `Server`:
 ```ts
 const data = Buffer.alloc(81)
 data.write('Sending some string as notification', 'ascii')
@@ -553,9 +553,48 @@ await server.sendDeviceNotification({
 }, data)
 ```
 
+When using `StandAloneServer`:
+```ts
+const data = Buffer.alloc(81)
+data.write('Sending some string as notification', 'ascii')
+
+await server.sendDeviceNotification({
+  notificationHandle: 1, //Previously saved
+  targetAdsPort: 851, //Previously saved
+  targetAmsNetId: '192.168.1.2.1.1', //Previously saved
+  sourceAdsPort: 851, //Previously saved
+  socket: socket //Previously saved
+}, data)
+```
+
+In practise, you can save the `packet.ads.notificationTarget` object, assign a handle to it and then send notifications using it:
+
+```ts
+//Simplified example
+let target = undefined
+
+server.onAddNotification(async (req, res, packet, adsPort) => {
+  target = packet.ads.notificationTarget
+  target.notificationHandle = 1
+  
+  res({ 
+    notificationHandle: target.notificationHandle
+  }).catch(err => console.log('Responding failed:', err))
+    
+})
+
+//Later...
+if(target) {
+  const data = Buffer.alloc(81)
+  data.write('Sending some string as notification', 'ascii')
+
+  await server.sendDeviceNotification(target, data)
+}
+```
+
 # NOTE: Difference when using `StandAloneServer`
 
-The examples work 1:1 for `StandAloneServer`, however there is one **major** difference.
+The examples work also for `StandAloneServer`, however there is one **major** difference.
 
 The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter `adsPort` or `packet.ams.targetAdsPort` of the callback function.
 

@@ -1177,11 +1177,11 @@ export abstract class ServerCore extends EventEmitter {
         rawData: Buffer.concat([packet, stamp, sample])
       }, socket)
         .then(() => {
-          this.debug(`sendDeviceNotification(): Device notification sent to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle}`)
+          this.debug(`sendDeviceNotificationToSocket(): Device notification sent to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle}`)
           resolve()
         })
         .catch(res => {
-          reject(new ServerException(this, 'sendDeviceNotification()', `Sending notification to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle} failed`, res))
+          reject(new ServerException(this, 'sendDeviceNotificationToSocket()', `Sending notification to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle} failed`, res))
         })
     })
   }
