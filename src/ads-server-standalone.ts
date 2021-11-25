@@ -30,11 +30,14 @@ import {
 } from 'net'
 
 import {
-  ServerCore
+  ServerCore, ServerException
 } from './ads-server-core'
 
 import {
+  AddNotificationReqCallback,
+  GenericReqCallback,
   ServerConnection,
+  StandAloneAdsNotificationTarget,
   StandAloneServerConnection,
   StandAloneServerSettings
 } from './types/ads-server'
@@ -168,6 +171,40 @@ export class StandAloneServer extends ServerCore {
   }
 
   /**
+   * Sends a given data as notification using given 
+   * notificationHandle and target info.
+   */
+  public sendDeviceNotification(notification: StandAloneAdsNotificationTarget, data: Buffer): Promise<void> {
+      if (!this.connection.connected)
+        throw new ServerException(this, 'sendDeviceNotification()', `Server is not active. Use listen() first.`)
+
+      if (!notification.socket)
+        throw new ServerException(this, 'sendDeviceNotification()', `Required notification.socket is missing.`)
+
+      return this.sendDeviceNotificationToSocket(
+        notification,
+        notification.sourceAdsPort,
+        notification.socket,
+        data
+      )
+  }
+
+  /**
+   * Sets callback function to be called when ADS AddNotification request is received
+   *
+   * @param callback Callback that is called when request received
+   * ```js
+   *  onAddNotification(async (req, res) => {
+   *    //do something with req object and then respond
+   *    await res({..})
+   *  })
+   * ```
+   */
+  public onAddNotification(callback: AddNotificationReqCallback<StandAloneAdsNotificationTarget>): void {
+    this.setRequestCallback(ADS.ADS_COMMAND.AddNotification, callback as GenericReqCallback)
+  }
+
+  /** 
    * Called when error is thrown at server instance
    * 
    * @param err Error object from this.server

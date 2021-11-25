@@ -36,7 +36,8 @@ import {
   AmsRouterState,
   RouterServerSettings,
   TimerObject,
-  ServerConnection
+  ServerConnection,
+  AdsNotificationTarget
 } from './types/ads-server'
 
 import {
@@ -153,6 +154,22 @@ export class RouterServer extends ServerCore {
    */
   public reconnect(): Promise<ServerConnection> {
     return this.reconnectToTarget()
+  }
+
+  /**
+   * Sends a given data as notification using given 
+   * notificationHandle and target info.
+   */
+  public sendDeviceNotification(notification: AdsNotificationTarget, data: Buffer): Promise<void> {
+    if (!this.connection.connected || !this.socket)
+      throw new ServerException(this, 'sendDeviceNotification()', `Server is not connected. Use connect() to connect first.`)
+
+    return this.sendDeviceNotificationToSocket(
+      notification,
+      this.connection.localAdsPort as number,
+      this.socket,
+      data
+    )
   }
 
   /**

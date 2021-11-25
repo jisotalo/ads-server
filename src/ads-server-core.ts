@@ -24,10 +24,13 @@ SOFTWARE.
 
 import {
   EventEmitter
+  
 } from 'events'
 import {
   Socket
 } from 'net'
+
+import long from 'long'
 import Debug from 'debug'
 import iconv from 'iconv-lite'
 
@@ -53,6 +56,7 @@ import {
   ReadWriteReqResponse,
   ServerConnection,
   ServerCoreSettings,
+  StandAloneAdsNotificationTarget,
   UnknownAdsRequest,
   WriteControlReq,
   WriteControlReqCallback,
@@ -103,6 +107,11 @@ export abstract class ServerCore extends EventEmitter {
    *  - 4 = full debugging (same as $env:DEBUG='ads-server,ads-server:details,ads-server:raw-data')
    */
   public debugLevel = 0
+
+  /**
+   * Next invoke ID to use (for notifications)
+   */
+  protected nextInvokeId = 0
 
   /**
    * Callback used for ams/tcp commands (like port register)
@@ -818,8 +827,10 @@ export abstract class ServerCore extends EventEmitter {
         //Let's add a helper object for sending notifications
         packet.ads.notificationTarget = {
           targetAmsNetId: packet.ams.targetAmsNetId,
-          targetAdsPort: packet.ams.sourceAdsPort
-        } as AdsNotificationTarget
+          targetAdsPort: packet.ams.sourceAdsPort,
+          sourceAdsPort: packet.ams.targetAdsPort,
+          socket
+        } as StandAloneAdsNotificationTarget
 
         callback(
           packet.ads,
@@ -1093,6 +1104,89 @@ export abstract class ServerCore extends EventEmitter {
   }
 
   /**
+   * Sends a device notification to target.
+   * @param notification Contains notification target info
+   * @param sourceAdsPort ADS port where notification is sent from
+   * @param socket Socket where to send data to
+   * @param data Data what to send
+   */
+  protected sendDeviceNotificationToSocket(notification: AdsNotificationTarget, sourceAdsPort: number, socket: Socket, data: Buffer): Promise<void> {
+    return new Promise<void>(async (resolve, reject) => {
+
+      if (notification.notificationHandle === undefined)
+        return reject(new ServerException(this, 'sendDeviceNotificationToSocket()', `notificationHandle is missing from parameter object "notification".`))
+
+      this.debug(`sendDeviceNotificationToSocket(): Sending device notification to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle}`)
+
+      //Sample
+      const sample = Buffer.alloc(8 + data.byteLength)
+      let pos = 0
+
+      //0..3 Notification handle
+      sample.writeUInt32LE(notification.notificationHandle, pos)
+      pos += 4
+
+      //4..7 Data length
+      sample.writeUInt32LE(data.byteLength, pos)
+      pos += 4
+
+      //8..n Data
+      data.copy(sample, pos)
+      pos += data.byteLength
+
+      //Stamp
+      const stamp = Buffer.alloc(12)
+      pos = 0
+
+      //0..7 Timestamp (Converting to Windows FILETIME)
+      const ts = long.fromNumber(new Date().getTime()).add(11644473600000).mul(10000)
+      stamp.writeUInt32LE(ts.getLowBitsUnsigned(), pos)
+      pos += 4
+
+      stamp.writeUInt32LE(ts.getHighBitsUnsigned(), pos)
+      pos += 4
+
+      //8..11 Number of samples
+      stamp.writeUInt32LE(1, pos)
+      pos += 4
+
+      //Notification
+      const packet = Buffer.alloc(8)
+      pos = 0
+
+      //0..3 Data length
+      packet.writeUInt32LE(sample.byteLength + stamp.byteLength + packet.byteLength)
+      pos += 4
+
+      //4..7 Stamp count
+      packet.writeUInt32LE(1, pos)
+      pos += 4
+
+      //Check that next free invoke ID is below 32 bit integer maximum
+      if (this.nextInvokeId >= ADS.ADS_INVOKE_ID_MAX_VALUE)
+        this.nextInvokeId = 0
+
+      //Sending the packet
+      this.sendAdsCommand({
+        adsCommand: ADS.ADS_COMMAND.Notification,
+        targetAmsNetId: notification.targetAmsNetId,
+        targetAdsPort: notification.targetAdsPort,
+        sourceAmsNetId: this.connection.localAmsNetId,
+        sourceAdsPort: sourceAdsPort,
+        invokeId: this.nextInvokeId++,
+        rawData: Buffer.concat([packet, stamp, sample])
+      }, socket)
+        .then(() => {
+          this.debug(`sendDeviceNotification(): Device notification sent to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle}`)
+          resolve()
+        })
+        .catch(res => {
+          reject(new ServerException(this, 'sendDeviceNotification()', `Sending notification to ${notification.targetAmsNetId}:${notification.targetAdsPort} with handle ${notification.notificationHandle} failed`, res))
+        })
+    })
+  }
+
+  /**
    * Sets request callback for given ADS command
    * 
    * @param request ADS command as number
@@ -1203,8 +1297,8 @@ export abstract class ServerCore extends EventEmitter {
    *  })
    * ```
    */
-  onAddNotification(callback: AddNotificationReqCallback): void {
-    this.setRequestCallback(ADS.ADS_COMMAND.AddNotification, callback)
+  onAddNotification(callback: AddNotificationReqCallback<AdsNotificationTarget>): void {
+    this.setRequestCallback(ADS.ADS_COMMAND.AddNotification, callback as GenericReqCallback)
   }
 
   /**
@@ -1245,6 +1339,7 @@ export abstract class ServerCore extends EventEmitter {
    */
   protected socketWrite(data: Buffer, socket: Socket): Promise<void> {
     return new Promise<void>(async (resolve, reject) => {
+
       if (this.debugIO.enabled) {
         this.debugIO(`IO out ------> ${data.byteLength} bytes : ${data.toString('hex')}`)
       } else {

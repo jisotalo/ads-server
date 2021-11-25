@@ -23,7 +23,19 @@ SOFTWARE.
 */
 
 import type { Socket } from 'net'
-import type { AmsTcpPacket } from './ads-types'
+import type { AdsData, AmsTcpPacket } from './ads-types'
+
+/** AMS packet that has device notification helper object */
+export interface AddNotificationAmsTcpPacket<T> extends AmsTcpPacket {
+  /** ADS data */
+  ads: AddNotificationAdsData<T>
+}
+
+/** ADS data that has device notification helper object */
+export interface AddNotificationAdsData<T> extends AdsData {
+  /** Device notification target information (helper object) */
+  notificationTarget: T
+}
 
 export interface ServerCoreSettings {
   /** Optional: Local AmsNetId to use (default: automatic) */
@@ -87,7 +99,7 @@ export type GenericReqCallback = (
   req: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res: any,
-  packet?: AmsTcpPacket,
+  packet?: AmsTcpPacket | AddNotificationAmsTcpPacket<AdsNotificationTarget> | AddNotificationAmsTcpPacket<StandAloneAdsNotificationTarget>,
   adsPort?: number
 ) => void
 
@@ -116,13 +128,23 @@ export interface ServerConnection {
  */
 export interface AdsNotificationTarget {
   /** Notification handle (unique for each registered notification) */
-  notificationHandle: number,
+  notificationHandle?: number,
   /** Target system AmsNetId (that subscribed to notifications) */
   targetAmsNetId: string,
   /** Target system ADS port (that subscribed to notifications) */
   targetAdsPort: number,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
+}
+
+/**
+ * ADS notification target parameters for StandAloneServer
+ */
+export interface StandAloneAdsNotificationTarget extends AdsNotificationTarget {
+  /** Socket to use for sending data */
+  socket: Socket,
+  /** Source system ADS port */
+  sourceAdsPort: number
 }
 
 /**
@@ -198,13 +220,13 @@ export type ReadStateReqCallback = (
 /**
  * AddNotification request callback
  */
-export type AddNotificationReqCallback = (
+export type AddNotificationReqCallback<T> = (
   /** Request data */
   req: AddNotificationReq,
   /** Response callback function (async) */
   res: AddNotificationReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket,
+  packet?: AddNotificationAmsTcpPacket<T>,
   /** ADS port where the request was received */
   adsPort?: number
 ) => void

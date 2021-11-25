@@ -21,8 +21,8 @@ If you need an ADS client for reading/writing PLC values, see my other project [
 - [Installing](#installing)
 - [Selecting correct server class to use](#selecting-correct-server-class-to-use)
 - [Configuration](#configuration)
-  * [`Server` class](#-server-class)
-  * [`StandAloneServer` class](#-standaloneserver-class)
+  * [`Server` class](#server-class)
+  * [`StandAloneServer` class](#standaloneserver-class)
 - [Available ADS commands](#available-ads-commands)
   * [Read request](#read-request)
   * [Write request](#write-request)
@@ -47,6 +47,7 @@ If you need an ADS client for reading/writing PLC values, see my other project [
   * [Enabling debug from code](#enabling-debug-from-code)
   * [Enabling debugging from terminal](#enabling-debugging-from-terminal)
 - [License](#license)
+
 # Installing
 
 Install the package from NPM using command:
@@ -61,7 +62,7 @@ After that, compiled sources are located under `./dist/`
 
 # Selecting correct server class to use
 
-As mentioned in the beginning, there are two servers available (since version 1.1.0)
+There are two servers available (since version 1.1.0)
 - `Server` for using with TwinCAT installation or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
   - For TwinCAT PLCs and Windows PCs with TwinCAT installation
   - For Raspberry Pi, Linux, etc. wth [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
@@ -69,21 +70,23 @@ As mentioned in the beginning, there are two servers available (since version 1.
   - For Raspberry Pi, Linux, etc. (nothing else is needed)
   - Use this if you don't have TC installed (unless you need `AdsRouterConsole` for some reason)
 
+---
+**TL;DR:** Use `Server` if you have TwinCAT installed.
+
+--- 
 **Differences:**
 - `Server` connects to the AMS router and then waits for incoming packets
   - The `StandAloneServer` starts its own TCP server (port 48898) and listens for any incoming packets
 - `Server` listens for commands to only one ADS port (however multiple instances can be created)
   - The `StandAloneServer` listens to all ADS ports (only single instance possible)
 
-**NOTE:** The following examples are for `Server`, however they work 1:1 with `StandAloneServer`.
-
- Please see chapter [NOTE: Difference when using `StandAloneServer`](#note--difference-when-using--standaloneserver-) for specific notes.**
+The following examples are for `Server`, however they work 1:1 with `StandAloneServer`. Please see chapter [NOTE: Difference when using `StandAloneServer`](#note-difference-when-using-standaloneserver) for specific notes.
 
 # Configuration
 
 ## `Server` class
 
-The `localAdsPort` can be any non-reserved ADS port. See `ADS_RESERVED_PORTS` type at [src/ads-commons.ts](https://github.com/jisotalo/ads-server/blob/master/src/ads-commons.ts). A port number over 20000 should be OK.
+The `localAdsPort` can be any non-reserved ADS port. See `ADS_RESERVED_PORTS` type at [src/ads-commons.ts](https://github.com/jisotalo/ads-server/blob/7a74d0ebcb51d1836c49c1364da0be748731ce18/src/ads-commons.ts#L86). A port number over 20000 should be OK.
 
 The `localAdsPort` should **always be provided** to ensure a static ADS port. Otherwise, the router provides next free one which always changes -> PLC/client code needs to be changed.
 
@@ -181,6 +184,8 @@ Available settings for `StandAloneServer`:
   hideConsoleWarnings: boolean,
 }
 ```
+
+For configuring the route, see this [ads-client README](https://github.com/jisotalo/ads-client/#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc).
 
 
 # Available ADS commands
@@ -552,7 +557,7 @@ await server.sendDeviceNotification({
 
 The examples work 1:1 for `StandAloneServer`, however there is one **major** difference.
 
-The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter `adsPort` of the callback function or `packet.ams.targetAdsPort`.
+The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter `adsPort` or `packet.ams.targetAdsPort` of the callback function.
 
 ```ts
 //Note: adsPort
