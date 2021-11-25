@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 23.11.2021
+## [1.1.0] - 25.11.2021
 ### Added
 - New `StandAloneServer` class
   - A new ADS server for systems without TwinCAT installation / AMS router
@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All request callbacks (like `onReadReq`) now have 4th parameter: `adsPort`
   - Contains the ADS port where the command was sent to
   - Required with `StandAloneServer` as it listens to all ADS ports
+- Better typings for `onAddNotification`
 - Lots of small improvements
 
 ## [1.0.0] - 20.11.2021
