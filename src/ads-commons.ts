@@ -1,6 +1,5 @@
 /*
 https://github.com/jisotalo/ads-server
-ads-commons.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
@@ -53,6 +52,16 @@ export const ADS_INDEX_GROUP_LENGTH = 4
  * ADS invoke ID maximum value (32bit unsigned integer)
  */
 export const ADS_INVOKE_ID_MAX_VALUE = 4294967295
+
+/**
+ * Default ADS server TCP port for incoming connections
+ */
+export const ADS_DEFAULT_TCP_PORT = 48898
+
+/**
+ * Loopback (localhost) AmsNetId
+ */
+export const LOOPBACK_AMS_NET_ID = '127.0.0.1.1.1'
 
 /**
  * AMS header flag (AMS command)

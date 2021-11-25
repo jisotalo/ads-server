@@ -1,6 +1,5 @@
 /*
 https://github.com/jisotalo/ads-server
-types/ads-server.ts
 
 Copyright (c) 2021 Jussi Isotalo <j.isotalo91@gmail.com>
 
@@ -24,9 +23,37 @@ SOFTWARE.
 */
 
 import type { Socket } from 'net'
-import type { AmsTcpPacket } from './ads-types'
+import type { AdsData, AmsTcpPacket } from './ads-types'
 
-export interface ServerSettings {
+/** AMS packet that has device notification helper object */
+export interface AddNotificationAmsTcpPacket<T> extends AmsTcpPacket {
+  /** ADS data */
+  ads: AddNotificationAdsData<T>
+}
+
+/** ADS data that has device notification helper object */
+export interface AddNotificationAdsData<T> extends AdsData {
+  /** Device notification target information (helper object) */
+  notificationTarget: T
+}
+
+export interface ServerCoreSettings {
+  /** Optional: Local AmsNetId to use (default: automatic) */
+  localAmsNetId?: string,
+  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
+  hideConsoleWarnings?: boolean,
+}
+
+export interface StandAloneServerSettings extends ServerCoreSettings {
+  /** Local AmsNetId to use */
+  localAmsNetId: string,
+  /** Optional: Local IP address to use, use this to change used network interface if required (default: '' = automatic) */
+  listeningAddress?: string,
+  /** Optional: Local TCP port to listen for incoming connections (default: 48898) */
+  listeningTcpPort?: number
+}
+
+export interface RouterServerSettings extends ServerCoreSettings {
   /** Optional: Target ADS router TCP port (default: 48898) */
   routerTcpPort: number,
   /** Optional: Target ADS router IP address/hostname (default: 'localhost') */
@@ -41,37 +68,26 @@ export interface ServerSettings {
   localAdsPort: number,
   /** Optional: Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout (default: 2000) */
   timeoutDelay: number,
-  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
-  hideConsoleWarnings: boolean,
   /** Optional: If true and connection to the router is lost, the server tries to reconnect automatically (default: true) */
   autoReconnect: boolean,
   /** Optional: Time (milliseconds) how often the lost connection is tried to re-establish (default: 2000) */
   reconnectInterval: number,
 }
 
-export interface ServerInternals {
-  /** Active debug level */
-  debugLevel: number,
-  /** Buffer for received data that is not yet handled */
-  receiveDataBuffer: Buffer,
-  /** Active socket that is used */
-  socket: Socket | null,
-  /** Next free invoke ID */
-  nextInvokeId: number,
-  /** Callback that is called when AMS TCP command is received (port register etc.) */
-  amsTcpCallback: ((packet: AmsTcpPacket) => void) | null,
-  /** Callback handler for socket connection lost event */
-  socketConnectionLostHandler: (() => void) | null,
-  /** Callback handler for socket error event */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  socketErrorHandler: ((err: any) => void) | null, //Handler for socket error event
-  /** Timer handle for reconnecting intervally */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  reconnectionTimer: any,
-  /** Active callbacks for ADS requests */
-  requestCallbacks: {
-    [key: string]: GenericReqCallback
-  }
+export interface StandAloneServerConnection {
+  /** Connection ID */
+  id: number,
+  /** Connection socket */
+  socket: Socket,
+  /** Connection receive data buffer */
+  buffer: Buffer
+}
+
+export interface TimerObject {
+  /** Timer ID */
+  id: number,
+  /** Timer handle */
+  timer?: NodeJS.Timeout
 }
 
 /**
@@ -83,19 +99,11 @@ export type GenericReqCallback = (
   req: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   res: any,
-  packet?: AmsTcpPacket
+  packet?: AmsTcpPacket | AddNotificationAmsTcpPacket<AdsNotificationTarget> | AddNotificationAmsTcpPacket<StandAloneAdsNotificationTarget>,
+  adsPort?: number
 ) => void
 
-
-/**
- * Server meta data
- */
-export interface ServerMetaData {
-  /** Current known state of the AMS router */
-  routerState: RouterState
-}
-
-export interface RouterState {
+export interface AmsRouterState {
   /** Router state */
   state: number,
   /** Router state as string */
@@ -106,12 +114,13 @@ export interface RouterState {
  * Connection info
  */
 export interface ServerConnection {
-  /** Is the server connected to the target AMS router */
+  /** Is the server connected to the AMS router (`Server`) 
+   * or is the server listening for incoming connections (`StandAloneServer`)*/
   connected: boolean,
-  /** Local AmsNetId (provided by router) */
+  /** Local AmsNetId of the server */
   localAmsNetId: string,
-  /** Local ADS port (provided by router) */
-  localAdsPort: number
+  /** Local ADS port of the server (only with `Server`) */
+  localAdsPort?: number
 }
 
 /**
@@ -119,7 +128,7 @@ export interface ServerConnection {
  */
 export interface AdsNotificationTarget {
   /** Notification handle (unique for each registered notification) */
-  notificationHandle: number,
+  notificationHandle?: number,
   /** Target system AmsNetId (that subscribed to notifications) */
   targetAmsNetId: string,
   /** Target system ADS port (that subscribed to notifications) */
@@ -128,6 +137,15 @@ export interface AdsNotificationTarget {
   [key: string]: any
 }
 
+/**
+ * ADS notification target parameters for StandAloneServer
+ */
+export interface StandAloneAdsNotificationTarget extends AdsNotificationTarget {
+  /** Socket to use for sending data */
+  socket: Socket,
+  /** Source system ADS port */
+  sourceAdsPort: number
+}
 
 /**
  * Read request callback
@@ -138,7 +156,9 @@ export type ReadReqCallback = (
   /** Response callback function (async) */
   res: ReadReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /**
@@ -150,9 +170,10 @@ export type ReadWriteReqCallback = (
   /** Response callback function (async) */
   res: ReadWriteReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
-
 
 /**
  * Write request callback
@@ -163,7 +184,9 @@ export type WriteReqCallback = (
   /** Response callback function (async) */
   res: WriteReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /**
@@ -175,7 +198,9 @@ export type ReadDeviceInfoReqCallback = (
   /** Response callback function (async) */
   res: ReadDeviceInfoReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /**
@@ -187,19 +212,23 @@ export type ReadStateReqCallback = (
   /** Response callback function (async) */
   res: ReadStateReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /**
  * AddNotification request callback
  */
-export type AddNotificationReqCallback = (
+export type AddNotificationReqCallback<T> = (
   /** Request data */
   req: AddNotificationReq,
   /** Response callback function (async) */
   res: AddNotificationReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AddNotificationAmsTcpPacket<T>,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /**
@@ -211,7 +240,9 @@ export type DeleteNotificationReqCallback = (
   /** Response callback function (async) */
   res: DeleteNotificationReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /**
@@ -223,7 +254,9 @@ export type WriteControlReqCallback = (
   /** Response callback function (async) */
   res: WriteControlReqResponseCallback,
   /** AmsTcp full packet */
-  packet?: AmsTcpPacket 
+  packet?: AmsTcpPacket,
+  /** ADS port where the request was received */
+  adsPort?: number
 ) => void
 
 /** ADS request type (any of these) */
@@ -332,7 +365,6 @@ export interface WriteControlReq {
   data: Buffer
 }
 
-
 /**
  * Response callback function
  */
@@ -396,8 +428,6 @@ export type WriteControlReqResponseCallback = (
   /** Data to be responsed */
   response: BaseResponse
 ) => Promise<void>
-
-
 
 /**
  * Base response, every response has this

@@ -5,13 +5,24 @@
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-server)
 [![License](https://img.shields.io/github/license/jisotalo/ads-server)](https://choosealicense.com/licenses/mit/)
 
-TwinCAT ADS server for Node.js (unofficial). Listens for incoming ADS protocol commands and responds.
+TwinCAT ADS server for Node.js (unofficial).  Listens for incoming ADS protocol commands and responds. 
+
+**Example use cases:**
+- Creating a server that can be connected from any TwinCAT PLC for reading and writing using ADS commands
+  - No need to write own protocols or to buy separate licenses
+- Creating a "fake PLC" to test your system that uses [ads-client](https://github.com/jisotalo/ads-client) under the hood
+- Using ADS protocol to communicate for your own systems
+
 
 If you need an ADS client for reading/writing PLC values, see my other project [ads-client](https://github.com/jisotalo/ads-client).
 
 
 # Table of contents
-- [Installing and configuration](#installing-and-configuration)
+- [Installing](#installing)
+- [Selecting correct server class to use](#selecting-correct-server-class-to-use)
+- [Configuration](#configuration)
+  * [`Server` class](#server-class)
+  * [`StandAloneServer` class](#standaloneserver-class)
 - [Available ADS commands](#available-ads-commands)
   * [Read request](#read-request)
   * [Write request](#write-request)
@@ -22,63 +33,97 @@ If you need an ADS client for reading/writing PLC values, see my other project [
   * [AddNotification requests](#addnotification-requests)
   * [DeleteNotification requests](#deletenotification-requests)
   * [Sending a notification](#sending-a-notification)
-- [Example: All example codes as a working version](#example--all-example-codes-as-a-working-version)
-- [Example: How to display full ADS packet from (debug etc.)](#example--how-to-display-full-ads-packet-from--debug-etc-)
-- [Example: Handling device notifications with ads-client](#example--handling-device-notifications-with-ads-client)
+- [NOTE: Difference when using `StandAloneServer`](#note-difference-when-using-standaloneserver)
+- [Handling IEC-61131 data types](#handling-iec-61131-data-types)
+  * [Responding with a IEC data type](#responding-with-a-iec-data-type)
+  * [Responding with a STRUCT](#responding-with-a-struct)
+- [Example: All example codes as a working version](#example-all-example-codes-as-a-working-version)
+- [Example: How to display full ADS packet from (debug etc.)](#example-how-to-display-full-ads-packet-from-debug-etc)
+- [Example: Handling device notifications with ads-client](#example-handling-device-notifications-with-ads-client)
+- [Example: Creating a fake PLC](#example-creating-a-fake-plc)
+  * [Base code for fake PLC system with `Server`](#base-code-for-fake-plc-system-with-server)
+  * [Base code for fake PLC system with `StandAloneServer`](#base-code-for-fake-plc-system-with-standaloneserver)
 - [Debugging](#debugging)
   * [Enabling debug from code](#enabling-debug-from-code)
   * [Enabling debugging from terminal](#enabling-debugging-from-terminal)
 - [License](#license)
 
-# Installing and configuration
+# Installing
 
-The localAdsPort can be any non-reserved ADS port. See `ADS_RESERVED_PORTS` type at [src/ads-commons.ts](https://github.com/jisotalo/ads-server/blob/master/src/ads-commons.ts). A port number over 20000 should be OK.
+Install the package from NPM using command:
+```bash
+npm i ads-server
+```
+Or if you like, you can clone the git repository and then build using command:
+```bash
+npm run build
+```
+After that, compiled sources are located under `./dist/`
 
-It should be always provided to ensure a static ADS port. Otherwise, the router provides next free one which always changes -> PLC/client code needs to be changed.
+# Selecting correct server class to use
 
-Javascript:
+There are two servers available (since version 1.1.0)
+- `Server` for using with TwinCAT installation or separate AMS router like [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
+  - For TwinCAT PLCs and Windows PCs with TwinCAT installation
+  - For Raspberry Pi, Linux, etc. wth [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/)
+- `StandAloneServer` for using without TwinCAT installation
+  - For Raspberry Pi, Linux, etc. (nothing else is needed)
+  - Use this if you don't have TC installed (unless you need `AdsRouterConsole` for some reason)
+
+---
+**TL;DR:** Use `Server` if you have TwinCAT installed.
+
+--- 
+**Differences:**
+- `Server` connects to the AMS router and then waits for incoming packets
+  - The `StandAloneServer` starts its own TCP server (port 48898) and listens for any incoming packets
+- `Server` listens for commands to only one ADS port (however multiple instances can be created)
+  - The `StandAloneServer` listens to all ADS ports (only single instance possible)
+
+The following examples are for `Server`, however they work 1:1 with `StandAloneServer`. Please see chapter [NOTE: Difference when using `StandAloneServer`](#note-difference-when-using-standaloneserver) for specific notes.
+
+# Configuration
+
+## `Server` class
+
+The `localAdsPort` can be any non-reserved ADS port. See `ADS_RESERVED_PORTS` type at [src/ads-commons.ts](https://github.com/jisotalo/ads-server/blob/7a74d0ebcb51d1836c49c1364da0be748731ce18/src/ads-commons.ts#L86). A port number over 20000 should be OK.
+
+The `localAdsPort` should **always be provided** to ensure a static ADS port. Otherwise, the router provides next free one which always changes -> PLC/client code needs to be changed.
+
+The setting are provided when creating the `Server` object and they are all optional. As default, the `Server` connects to the local AMS router running at localhost but it can be changed from settings.
+
 ```js
 const { Server } = require('ads-server')
+//import { Server } from 'ads-server' //Typescript
 
+//Creating a new server instance at ADS port 30012
 const server = new Server({
   localAdsPort: 30012
 })
 
 //Connect to the local AMS router
 server.connect()
-  .then(conn => {
+  .then(async conn => {
     console.log('Connected:', conn)
+
+    //To disconnect:
+    //await server.disconnect()
   })
   .catch(err => {
     console.log('Connecting failed:', err)
   })
 ```
 
-Typescript:
-```ts
-import { Server } from 'ads-server'
-
-//Creating a new server instace at ADS port 30012
-const server = new Server({
-  localAdsPort: 30012
-})
-
-//Connect to the local AMS router
-server.connect()
-  .then(conn => {
-    console.log('Connected:', conn)
-  })
-  .catch(err => {
-    console.log('Connecting failed:', err)
-  })
-
-```
-The setting are provided when creating the Server object and they are all optional. As default, the Server connects to the local AMS router running at localhost but it can be changed from settings.
-
-Available settings:
+Available settings for `Server`:
 
 ```ts
 {
+  /** Optional: Local ADS port to use (default: automatic/router provides) */
+  localAdsPort: number,
+  /** Optional: Local AmsNetId to use (default: automatic) */
+  localAmsNetId: string,
+  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
+  hideConsoleWarnings: boolean,
   /** Optional: Target ADS router TCP port (default: 48898) */
   routerTcpPort: number,
   /** Optional: Target ADS router IP address/hostname (default: 'localhost') */
@@ -89,18 +134,59 @@ Available settings:
   localTcpPort: number,
   /** Optional: Local AmsNetId to use (default: automatic) */
   localAmsNetId: string,
-  /** Optional: Local ADS port to use (default: automatic/router provides) */
-  localAdsPort: number,
   /** Optional: Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout (default: 2000) */
   timeoutDelay: number,
-  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
-  hideConsoleWarnings: boolean,
   /** Optional: If true and connection to the router is lost, the server tries to reconnect automatically (default: true) */
   autoReconnect: boolean,
   /** Optional: Time (milliseconds) how often the lost connection is tried to re-establish (default: 2000) */
   reconnectInterval: number,
 }
 ```
+
+## `StandAloneServer` class
+
+The only required setting for `StandAloneServer` is `localAmsNetId`. Unlike `Server`, it listens for all ADS ports for incoming commands.
+
+The `localAmsNetId` can be decided freely. Only requirement is that it's not in use by any other system. It is needed when creating a static route from another system.
+
+```js
+const { StandAloneServer } = require('ads-server')
+//import { StandAloneServer } from 'ads-server' //Typescript
+
+const server = new StandAloneServer({
+  localAmsNetId: '192.168.5.10.1.1' //You can decide whatever you like (needs to be free)
+})
+
+server.listen()
+  .then(async conn => {
+    console.log('Listening:', conn)
+
+    //To stop listening:
+    //await server.close()
+  })
+  .catch(err => {
+    console.log('Listening failed:', err)
+  })
+```
+
+
+Available settings for `StandAloneServer`:
+
+```ts
+{
+  /** Local AmsNetId to use */
+  localAmsNetId: string,
+  /** Optional: Local IP address to use, use this to change used network interface if required (default: '' = automatic) */
+  listeningAddress: string,
+  /** Optional: Local TCP port to listen for incoming connections (default: 48898) */
+  listeningTcpPort: number
+  /** Optional: If true, no warnings are written to console (= nothing is ever written to console) (default: false) */
+  hideConsoleWarnings: boolean,
+}
+```
+
+For configuring the route, see this [ads-client README](https://github.com/jisotalo/ads-client/#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc).
+
 
 # Available ADS commands
 
@@ -455,7 +541,7 @@ server.onDeleteNotification(async (req, res) => {
 Not available with a PLC as a client, see an example with `ads-client` later.
 
 
-Node.js (server):
+When using `Server`:
 ```ts
 const data = Buffer.alloc(81)
 data.write('Sending some string as notification', 'ascii')
@@ -465,6 +551,181 @@ await server.sendDeviceNotification({
   targetAdsPort: 851, //Previously saved
   targetAmsNetId: '192.168.1.2.1.1' //Previously saved
 }, data)
+```
+
+When using `StandAloneServer`:
+```ts
+const data = Buffer.alloc(81)
+data.write('Sending some string as notification', 'ascii')
+
+await server.sendDeviceNotification({
+  notificationHandle: 1, //Previously saved
+  targetAdsPort: 851, //Previously saved
+  targetAmsNetId: '192.168.1.2.1.1', //Previously saved
+  sourceAdsPort: 851, //Previously saved
+  socket: socket //Previously saved
+}, data)
+```
+
+In practise, you can save the `packet.ads.notificationTarget` object, assign a handle to it and then send notifications using it:
+
+```ts
+//Simplified example
+let target = undefined
+
+server.onAddNotification(async (req, res, packet, adsPort) => {
+  target = packet.ads.notificationTarget
+  target.notificationHandle = 1
+  
+  res({ 
+    notificationHandle: target.notificationHandle
+  }).catch(err => console.log('Responding failed:', err))
+    
+})
+
+//Later...
+if(target) {
+  const data = Buffer.alloc(81)
+  data.write('Sending some string as notification', 'ascii')
+
+  await server.sendDeviceNotification(target, data)
+}
+```
+
+# NOTE: Difference when using `StandAloneServer`
+
+The examples work also for `StandAloneServer`, however there is one **major** difference.
+
+The received command can be sent to **any ADS port**. So the target ADS port needs to be checked using 4th parameter `adsPort` or `packet.ams.targetAdsPort` of the callback function.
+
+```ts
+//Note: adsPort
+server.onReadReq(async (req, res, packet, adsPort) => {
+  console.log('Read request', req, 'received to ADS port', adsPort)
+
+  const data = Buffer.alloc(2)
+
+  switch (adsPort) { //adsPort or packet.ams.targetAdsPort
+    case 30012:
+      //Request for ADS port 30012 -> respond 5555
+      data.writeInt16LE(5555)
+
+      await res({ data })
+        .catch(err => console.log('Responding failed:', err))
+      break
+    
+    case 30013:
+      //Request for ADS port 30013 -> respond 888
+      data.writeInt16LE(888)
+
+      await res({ data })
+        .catch(err => console.log('Responding failed:', err))
+    
+      break
+    
+    default:
+      await res({
+        error: 6 //ADS error code, "Target port not found"
+      }).catch(err => console.log('Responding failed:', err))
+  }
+})
+```
+If you have a need for only one ADS port, you might do something as simple as:
+
+```ts
+server.onReadReq(async (req, res, packet, adsPort) => {
+  console.log('Read request', req, 'received to ADS port', adsPort)
+
+  if (adsPort !== 30012) { //adsPort or packet.ams.targetAdsPort
+    await res({
+      error: 6 //ADS error code, "Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+
+    return 
+  }
+
+  //Then do the magic here..
+})
+```
+
+# Handling IEC-61131 data types
+
+It's not too easy to work with byte buffers if you want to respond to a PLC request.
+
+Instead, you can use the [iec-61131-3](https://github.com/jisotalo/iec-61131-3) library to work with IEC data types.
+
+## Responding with a IEC data type
+
+Some examples how to respond with different data types:
+
+```js
+const iec = require('iec-61131-3')
+
+//...
+
+//DINT
+await res({
+  data: iec.DINT.convertToBuffer(12345)
+})
+
+//STRING
+await res({
+  data: iec.STRING(81).convertToBuffer('Convert this!')
+})
+
+//ARRAY[0..2] OF INT
+await res({
+  data: iec.ARRAY(iec.INT, 3).convertToBuffer([1, 2, 3])
+})
+
+//DT
+await res({
+  data: iec.DT.convertToBuffer(new Date().getTime() / 1000)
+})
+```
+
+The same library can be used with `ads-client`. For example:
+
+```js
+const iec = require('iec-61131-3')
+
+//...
+
+//Reading the ARRAY[0..2] OF INT defined above (indexGroup and indexOffset are just examples)
+const data = await client.readRaw(1, 2, iec.ARRAY(iec.INT, 3).byteLength)
+const arr = iec.ARRAY(iec.INT, 3).convertFromBuffer(data)
+console.log(arr) //"[ 1, 2, 3 ]"
+
+//Reading the STRING defined above (indexGroup and indexOffset are just examples)
+const data = await client.readRaw(1, 2, iec.STRING(81).byteLength)
+const str = iec.STRING(81).convertFromBuffer(data)
+console.log(str) //"Convert this!"
+```
+
+## Responding with a STRUCT
+
+```js
+const iec = require('iec-61131-3')
+
+//...
+
+const ST_Struct = iec.fromString(`
+  {attribute 'pack_mode' := '1'}
+  TYPE ST_Struct:
+  STRUCT
+    variable1: INT;
+    variable2: REAL;
+  END_STRUCT
+  END_TYPE
+`)
+
+const data = ST_Struct.convertToBuffer({
+  variable1: 123,
+  variable2: 3.14
+})
+
+await res({ data })
+
 ```
 
 # Example: All example codes as a working version
@@ -493,7 +754,7 @@ The PLC code is exported as PlcOpenXML format.
 
 # Example: How to display full ADS packet from (debug etc.)
 
-In the examples above, a callback of type `(req, res)` is provided for each function. It is also possible to provide 3rd parameter `(req, res, packet)` for debuggin purposes.
+In the examples above, a callback of type `(req, res)` is provided for each function. It is also possible to provide 3rd parameter `(req, res, packet)` for debugging purposes.
 
 ```ts
 server.onReadReq(async (req, res, packet) => {
@@ -523,6 +784,7 @@ Full packet is: {
   ads: { indexGroup: 10, indexOffset: 100, readLength: 2 }
 }
 ```
+As of version 1.1.0, there is also 4th parameter `adsPort`, which is the same as `packet.ams.targetAdsPort`.
 
 # Example: Handling device notifications with ads-client
 
@@ -661,6 +923,373 @@ client.connect()
   })
   .catch(err => console.log('Failed to connect:', err))
 ```
+
+# Example: Creating a fake PLC
+The following needs to be provided by the ADS server in order the `ads-client` sees it as a normal PLC:
+- System manager state
+- PLC runtime state
+- PLC runtime state changes (notifications)
+- Device info
+- Upload info
+- *Optional: Symbol version*
+- *Optional: Symbol version changes (notifications)*
+- *Optional: Symbols*
+- *Optional: Data types*
+
+In this example the optional parts are skipped. In order the `ads-client` to work without them, following settings need to be provided to `ads-client`:
+
+```js
+const client = new ads.Client({
+  //Unrelevant settings not shown
+  disableSymbolVersionMonitoring: true,
+  readAndCacheSymbols: false,
+  readAndCacheDataTypes: false,
+})
+```
+
+## Base code for fake PLC system with `Server`
+
+The following can be used as a base to fake a PLC system. 
+
+The system manager is handled by TwinCAT router or some other router.
+
+```js
+const { Server, ADS } = require('./ads-server/dist/ads-server')
+
+const server = new Server({
+  localAdsPort: ADS.ADS_RESERVED_PORTS.Tc3_Plc1 //NOTE: Local PLC can't be running at the same time
+})
+
+server.onReadState(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      adsState: ADS.ADS_STATE.Run,
+      deviceState: 0
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadDeviceInfo(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      deviceName: 'Fake PLC runtime 1',
+      majorVersion: 1,
+      minorVersion: 0,
+      versionBuild: 1
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onAddNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.DeviceData) {
+      //Runtime state changes
+      await res({
+        notificationHandle: 1 //This isn't correct way, see example "Handling device notifications with ads-client"
+      }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadReq(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUploadInfo2) {
+      //Upload info, responding 0 to all for now
+      const data = Buffer.alloc(24)
+      let pos = 0
+
+      //0..3 Symbol count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //4..7 Symbol length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //8..11 Data type count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //12..15 Data type length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //16..19 Extra count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //20..23 Extra length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      await res({
+        data
+      }).catch(err => console.log('Responding failed:', err))
+
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onDeleteNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.notificationHandle === 1) { //This isn't correct way, see example "Handling device notifications with ads-client"
+      await res({ }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handle deletion should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+
+server.connect()
+  .then(res => {
+    console.log('Connected:', res)
+  })
+  .catch(err => {
+    console.log('Error starting:', err)
+  })
+
+```
+
+## Base code for fake PLC system with `StandAloneServer`
+
+The following can be used as a base to fake a PLC system. It also handles system manager at port 10000.
+
+Won't work if there is a local router.
+```js
+const { StandAloneServer, ADS } = require('./ads-server/dist/ads-server')
+
+const server = new StandAloneServer({
+  localAmsNetId: '192.168.5.1.1.1'
+})
+
+server.onReadState(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      adsState: ADS.ADS_STATE.Run,
+      deviceState: 0
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      adsState: ADS.ADS_STATE.Run,
+      deviceState: 0
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadDeviceInfo(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      deviceName: 'Fake PLC',
+      majorVersion: 1,
+      minorVersion: 0,
+      versionBuild: 1
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    await res({
+      deviceName: 'Fake PLC runtime 1',
+      majorVersion: 1,
+      minorVersion: 0,
+      versionBuild: 1
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onAddNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      error: 1793 //"Service is not supported by server"
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.DeviceData) {
+      //Runtime state changes
+      await res({
+        notificationHandle: 1 //This isn't correct way, see example "Handling device notifications with ads-client"
+      }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onReadReq(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      error: 1793 //"Service is not supported by server"
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    if (req.indexGroup === ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUploadInfo2) {
+      //Upload info, responding 0 to all for now
+      const data = Buffer.alloc(24)
+      let pos = 0
+
+      //0..3 Symbol count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //4..7 Symbol length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //8..11 Data type count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //12..15 Data type length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //16..19 Extra count
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      //20..23 Extra length
+      data.writeUInt32LE(0, pos)
+      pos += 4
+
+      await res({
+        data
+      }).catch(err => console.log('Responding failed:', err))
+
+    } else {
+      //Your custom notification handles should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+server.onDeleteNotification(async (req, res, packet, adsPort) => {
+  if (adsPort === ADS.ADS_RESERVED_PORTS.SystemService) {
+    //System manager / system service (port 10000)
+    await res({
+      error: 1793 //"Service is not supported by server"
+    }).catch(err => console.log('Responding failed:', err))
+
+  } else if (adsPort === ADS.ADS_RESERVED_PORTS.Tc3_Plc1) {
+    //TC3 PLC runtime 1 (port 851)
+    if (req.notificationHandle === 1) { //This isn't correct way, see example "Handling device notifications with ads-client"
+      await res({ }).catch(err => console.log('Responding failed:', err))
+      
+    } else {
+      //Your custom notification handle deletion should be here
+      //For now, just answer with error
+      await res({
+        error: 1794 //"Invalid index group"
+      }).catch(err => console.log('Responding failed:', err))
+    }
+
+  } else {
+    //Unknown port
+    await res({
+      error: 6 //"Target port not found"
+    }).catch(err => console.log('Responding failed:', err))
+  }
+})
+
+
+server.listen()
+  .then(res => {
+    console.log('Listening:', res)
+  })
+  .catch(err => {
+    console.log('Error starting to listen:', err)
+  })
+
+```
+
 # Debugging
 
 To debug each received packet, see: [Example: How to display full ADS packet from (debug etc.)](#example--how-to-display-full-ads-packet-from--debug-etc-)
