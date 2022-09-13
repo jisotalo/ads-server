@@ -64,7 +64,7 @@ export class RouterServer extends ServerCore {
    */
   public settings: RouterServerSettings = {
     routerTcpPort: 48898,
-    routerAddress: 'localhost',
+    routerAddress: '127.0.0.1',
     localAddress: '',
     localTcpPort: 0,
     localAmsNetId: '',

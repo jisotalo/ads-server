@@ -56,7 +56,7 @@ export interface StandAloneServerSettings extends ServerCoreSettings {
 export interface RouterServerSettings extends ServerCoreSettings {
   /** Optional: Target ADS router TCP port (default: 48898) */
   routerTcpPort: number,
-  /** Optional: Target ADS router IP address/hostname (default: 'localhost') */
+  /** Optional: Target ADS router IP address/hostname (default: '127.0.0.1') */
   routerAddress: string,
   /** Optional: Local IP address to use, use this to change used network interface if required (default: '' = automatic) */
   localAddress: string,
