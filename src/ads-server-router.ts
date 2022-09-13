@@ -64,7 +64,7 @@ export class RouterServer extends ServerCore {
    */
   public settings: RouterServerSettings = {
     routerTcpPort: 48898,
-    routerAddress: 'localhost',
+    routerAddress: '127.0.0.1',
     localAddress: '',
     localTcpPort: 0,
     localAmsNetId: '',
@@ -335,6 +335,7 @@ export class RouterServer extends ServerCore {
       socket.setTimeout(this.settings.timeoutDelay);
 
       //Finally, connect
+      console.log(this.settings) 
       try {
         socket.connect({
           port: this.settings.routerTcpPort,
