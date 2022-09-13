@@ -335,7 +335,6 @@ export class RouterServer extends ServerCore {
       socket.setTimeout(this.settings.timeoutDelay);
 
       //Finally, connect
-      console.log(this.settings) 
       try {
         socket.connect({
           port: this.settings.routerTcpPort,
